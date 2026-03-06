@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>📏 部屋の幅チェッカー</title>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d0d0d;
+      --surface: #1a1a1a;
+      --surface2: #242424;
+      --accent: #00e5a0;
+      --accent2: #ff4d6d;
+      --accent3: #ffd166;
+      --text: #f0f0f0;
+      --muted: #888;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Zen Kaku Gothic New', sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+    }
+
+    /* ヘッダー */
+    header {
+      width: 100%;
+      padding: 18px 20px 14px;
+      background: var(--surface);
+      border-bottom: 1px solid #2a2a2a;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    header .icon {
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+    }
+
+    header p {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ステップインジケーター */
+    .steps {
+      display: flex;
+      gap: 6px;
+      padding: 14px 20px;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .step-dot {
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--surface2);
+      transition: background 0.3s;
+    }
+
+    .step-dot.active { background: var(--accent); }
+    .step-dot.done   { background: var(--accent); opacity: 0.4; }
+
+    /* セクション共通 */
+    .section {
+      width: 100%;
+      max-width: 480px;
+      padding: 0 16px 24px;
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+      animation: fadeUp 0.35s ease;
+    }
+
+    .section.visible { display: flex; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* カード */
+    .card {
+      background: var(--surface);
+      border-radius: 16px;
+      padding: 18px;
+      border: 1px solid #2a2a2a;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    /* カメラエリア */
+    #camera-wrap {
+      position: relative;
+      width: 100%;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #111;
+      aspect-ratio: 4/3;
+      border: 1px solid #2a2a2a;
+    }
+
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    #overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      cursor: crosshair;
+    }
+
+    /* カメラ起動前のプレースホルダー */
+    #cam-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    #cam-placeholder .big { font-size: 48px; }
+
+    /* 十字線（照準） */
+    .crosshair {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px; height: 40px;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    .crosshair::before, .crosshair::after {
+      content: '';
+      position: absolute;
+      background: var(--accent);
+    }
+
+    .crosshair::before {
+      width: 1px; height: 100%;
+      left: 50%; top: 0;
+    }
+
+    .crosshair::after {
+      width: 100%; height: 1px;
+      top: 50%; left: 0;
+    }
+
+    /* 計測値表示 */
+    #measurement-display {
+      text-align: center;
+      padding: 16px;
+      background: var(--surface2);
+      border-radius: 12px;
+      border: 1px solid #2e2e2e;
+    }
+
+    #measurement-display .value {
+      font-size: 48px;
+      font-weight: 900;
+      color: var(--accent);
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+
+    #measurement-display .unit {
+      font-size: 20px;
+      color: var(--muted);
+      margin-left: 4px;
+    }
+
+    #measurement-display .label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* ガイドメッセージ */
+    .guide-msg {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface2);
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .guide-msg .emoji { font-size: 22px; flex-shrink: 0; }
+
+    /* 基準サイズ入力 */
+    .ref-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .ref-row label {
+      font-size: 13px;
+      color: var(--muted);
+      flex: 1;
+      min-width: 160px;
+    }
+
+    .ref-row input {
+      width: 80px;
+      background: var(--surface2);
+      border: 1px solid #3a3a3a;
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 18px;
+      font-family: inherit;
+      font-weight: 700;
+      padding: 8px 12px;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .ref-row input:focus { border-color: var(--accent); }
+    .ref-row span { font-size: 13px; color: var(--muted); }
+
+    /* ボタン */
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      border: none;
+      font-family: inherit;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, opacity 0.15s;
+      letter-spacing: 0.02em;
+    }
+
+    .btn:active { transform: scale(0.97); opacity: 0.85; }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .btn-danger {
+      background: var(--accent2);
+      color: #fff;
+    }
+
+    .btn-ghost {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid #3a3a3a;
+    }
+
+    .btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* 家具チェック結果 */
+    #result-section .big-result {
+      text-align: center;
+      padding: 20px;
+      background: var(--surface2);
+      border-radius: 16px;
+    }
+
+    #result-section .big-result .num {
+      font-size: 56px;
+      font-weight: 900;
+      color: var(--accent);
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+
+    #result-section .big-result .sub {
+      font-size: 14px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .furniture-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .furniture-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: var(--surface2);
+      border-left: 4px solid transparent;
+      transition: transform 0.2s;
+      animation: fadeUp 0.3s ease both;
+    }
+
+    .furniture-item.ok  { border-color: var(--accent); }
+    .furniture-item.ng  { border-color: var(--accent2); }
+    .furniture-item.edge { border-color: var(--accent3); }
+
+    .furniture-item .f-name { font-size: 14px; font-weight: 700; }
+    .furniture-item .f-size { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .furniture-item .f-badge {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    .furniture-item.ok   .f-badge { background: rgba(0,229,160,0.15); color: var(--accent); }
+    .furniture-item.ng   .f-badge { background: rgba(255,77,109,0.15); color: var(--accent2); }
+    .furniture-item.edge .f-badge { background: rgba(255,209,102,0.15); color: var(--accent3); }
+
+    /* エラー表示 */
+    .error-box {
+      background: rgba(255,77,109,0.1);
+      border: 1px solid rgba(255,77,109,0.3);
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 13px;
+      color: var(--accent2);
+      display: none;
+    }
+
+    /* 使い方ヒント */
+    .hint-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .hint-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .hint-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #000;
+      font-size: 12px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .hint-text { font-size: 13px; line-height: 1.6; color: var(--muted); }
+    .hint-text strong { color: var(--text); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="icon">📏</div>
+  <div>
+    <h1>部屋の幅チェッカー</h1>
+    <p>カメラで2点をタップして幅を計測</p>
+  </div>
+</header>
+
+<!-- ステップドット -->
+<div class="steps" id="step-dots">
+  <div class="step-dot active" id="dot0"></div>
+  <div class="step-dot" id="dot1"></div>
+  <div class="step-dot" id="dot2"></div>
+</div>
+
+<!-- ========== STEP 0: 使い方説明 ========== -->
+<div class="section visible" id="step0">
+
+  <div class="card">
+    <div class="card-title">📖 使い方</div>
+    <div class="hint-list">
+      <div class="hint-item">
+        <div class="hint-num">1</div>
+        <div class="hint-text"><strong>基準になるものを用意</strong><br>A4用紙（21cm）や定規を床に置く。これが計測の目安になります。</div>
+      </div>
+      <div class="hint-item">
+        <div class="hint-num">2</div>
+        <div class="hint-text"><strong>カメラを起動</strong><br>「カメラ起動」ボタンを押してカメラを使う許可を与える。</div>
+      </div>
+      <div class="hint-item">
+        <div class="hint-num">3</div>
+        <div class="hint-text"><strong>基準サイズを入力</strong><br>床に置いたものの幅（cm）を入力する。</div>
+      </div>
+      <div class="hint-item">
+        <div class="hint-num">4</div>
+        <div class="hint-text"><strong>2点をタップ</strong><br>測りたい場所の「端」と「端」を画面でタップする。</div>
+      </div>
+      <div class="hint-item">
+        <div class="hint-num">5</div>
+        <div class="hint-text"><strong>結果を確認</strong><br>自動で家具が「通れるか」チェックします。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="guide-msg">
+    <div class="emoji">⚠️</div>
+    <div>精度は<strong>誤差5〜15cm程度</strong>です。ギリギリの場合は実際にメジャーで確認してください。</div>
+  </div>
+
+  <button class="btn btn-primary" onclick="goToStep(1)">
+    📷 はじめる
+  </button>
+
+</div>
+
+<!-- ========== STEP 1: カメラ計測 ========== -->
+<div class="section" id="step1">
+
+  <!-- カメラ映像 -->
+  <div id="camera-wrap">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+    <div id="cam-placeholder">
+      <div class="big">📷</div>
+      <div>「カメラ起動」を押してください</div>
+    </div>
+    <div class="crosshair" id="crosshair"></div>
+  </div>
+
+  <!-- 計測値表示 -->
+  <div id="measurement-display">
+    <span class="value" id="val">--</span><span class="unit">cm</span>
+    <div class="label" id="measure-label">測定前</div>
+  </div>
+
+  <!-- ガイドメッセージ -->
+  <div class="guide-msg" id="guide-msg">
+    <div class="emoji">👆</div>
+    <div id="guide-text">まず「カメラ起動」を押してください</div>
+  </div>
+
+  <!-- エラーボックス -->
+  <div class="error-box" id="error-box">❌ <span id="error-text"></span></div>
+
+  <!-- 基準サイズ入力 -->
+  <div class="card">
+    <div class="card-title">📌 基準サイズ入力</div>
+    <div class="ref-row">
+      <label>床に置いたものの幅</label>
+      <input type="number" id="refSize" value="21" min="1" max="500">
+      <span>cm</span>
+    </div>
+    <div style="font-size:11px; color:var(--muted); margin-top:8px;">
+      例：A4用紙＝21cm　｜　B5用紙＝18.2cm　｜　定規＝30cm
+    </div>
+  </div>
+
+  <!-- ボタン群 -->
+  <button class="btn btn-primary" id="cam-btn" onclick="startCamera()">
+    📷 カメラ起動
+  </button>
+
+  <button class="btn btn-ghost" id="reset-btn" onclick="resetPoints()" disabled>
+    🔄 やり直す
+  </button>
+
+  <button class="btn btn-danger" id="next-btn" onclick="goToStep(2)" disabled>
+    家具チェックへ進む →
+  </button>
+
+</div>
+
+<!-- ========== STEP 2: 家具チェック結果 ========== -->
+<div class="section" id="result-section" style="display:none">
+
+  <div class="big-result">
+    <div class="num" id="result-cm">--</div>
+    <div class="sub">計測された通路の最小幅（cm）</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🛋️ 家具の搬入チェック</div>
+    <div class="furniture-list" id="furniture-list"></div>
+  </div>
+
+  <div class="guide-msg">
+    <div class="emoji">💡</div>
+    <div>「△ギリギリ」の家具は実際にメジャーで測って確認することをおすすめします。</div>
+  </div>
+
+  <button class="btn btn-ghost" onclick="goToStep(1)">
+    ← もう一度測る
+  </button>
+
+</div>
+
+<script>
+  // ===========================
+  // 状態管理
+  // ===========================
+  let points = [];
+  let measuredCm = null;
+  let stream = null;
+  const video   = document.getElementById('video');
+  const canvas  = document.getElementById('overlay');
+  const ctx     = canvas.getContext('2d');
+
+  // ===========================
+  // ステップ切替
+  // ===========================
+  function goToStep(n) {
+    ['step0', 'step1', 'result-section'].forEach((id, i) => {
+      const el = document.getElementById(id);
+      el.style.display = (i === n) ? 'flex' : 'none';
+      el.classList.toggle('visible', i === n);
+    });
+
+    // ドット更新
+    [0, 1, 2].forEach(i => {
+      const d = document.getElementById('dot' + i);
+      d.className = 'step-dot' + (i < n ? ' done' : i === n ? ' active' : '');
+    });
+
+    if (n === 2) showFurnitureResults();
+  }
+
+  // ===========================
+  // カメラ起動
+  // ===========================
+  async function startCamera() {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 960 } }
+      });
+      video.srcObject = stream;
+      video.onloadedmetadata = () => {
+        canvas.width  = video.videoWidth;
+        canvas.height = video.videoHeight;
+      };
+
+      document.getElementById('cam-placeholder').style.display = 'none';
+      document.getElementById('crosshair').style.display = 'none';
+      document.getElementById('cam-btn').textContent = '✅ カメラ起動中';
+      document.getElementById('cam-btn').disabled = true;
+      document.getElementById('reset-btn').disabled = false;
+      setGuide('👆', '測りたい場所の<strong>端（1点目）</strong>をタップしてください');
+      hideError();
+    } catch(e) {
+      showError('カメラを起動できませんでした。ブラウザのカメラ許可を確認してください。');
+    }
+  }
+
+  // ===========================
+  // タップ処理
+  // ===========================
+  canvas.addEventListener('click', (e) => {
+    if (!stream) return; // カメラが起動していなければ無視
+    if (points.length >= 2) return;
+
+    const rect   = canvas.getBoundingClientRect();
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top)  * scaleY;
+
+    points.push({ x, y });
+    drawCanvas();
+
+    if (points.length === 1) {
+      setGuide('👆', '次に<strong>反対側の端（2点目）</strong>をタップしてください');
+    } else if (points.length === 2) {
+      calculate();
+    }
+  });
+
+  // ===========================
+  // キャンバス描画
+  // ===========================
+  function drawCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 2点を結ぶ線
+    if (points.length === 2) {
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      ctx.lineTo(points[1].x, points[1].y);
+      ctx.strokeStyle = '#ffd166';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([10, 5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // 各ポイント
+    const colors = ['#00e5a0', '#ff4d6d'];
+    points.forEach((p, i) => {
+      // 外枠
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
+      ctx.fillStyle = colors[i] + '33';
+      ctx.fill();
+
+      // 本体
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 12, 0, Math.PI * 2);
+      ctx.fillStyle = colors[i];
+      ctx.fill();
+
+      // 番号
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(i + 1, p.x, p.y);
+    });
+  }
+
+  // ===========================
+  // 距離計算
+  // ===========================
+  function calculate() {
+    const dx = points[1].x - points[0].x;
+    const dy = points[1].y - points[0].y;
+    const pixelDist = Math.sqrt(dx * dx + dy * dy);
+
+    // 基準サイズ（cm）を取得
+    const refCm = parseFloat(document.getElementById('refSize').value) || 21;
+
+    // 画面横幅(px)に対する基準物の推定px幅を求める
+    // 仮定: 基準物（床置き）が画面横幅の約20%を占めると仮定
+    // ユーザーが基準物を画面内に収めてスキャンすることを前提とした簡易計算
+    const screenW  = canvas.width;
+    const refPxEstimate = screenW * 0.20; // 基準物が画面の約20%
+    const cmPerPx  = refCm / refPxEstimate;
+    const realCm   = pixelDist * cmPerPx;
+
+    measuredCm = realCm;
+
+    document.getElementById('val').textContent = realCm.toFixed(1);
+    document.getElementById('measure-label').textContent = '計測完了';
+
+    setGuide('✅', `計測完了！<strong>${realCm.toFixed(1)} cm</strong>　「家具チェックへ進む」を押してください`);
+    document.getElementById('next-btn').disabled = false;
+  }
+
+  // ===========================
+  // リセット
+  // ===========================
+  function resetPoints() {
+    points = [];
+    measuredCm = null;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    document.getElementById('val').textContent = '--';
+    document.getElementById('measure-label').textContent = '測定前';
+    document.getElementById('next-btn').disabled = true;
+    setGuide('👆', '測りたい場所の<strong>端（1点目）</strong>をタップしてください');
+  }
+
+  // ===========================
+  // 家具チェック結果表示
+  // ===========================
+  const furnitureData = [
+    { name: 'シングルベッド',       width: 97,  icon: '🛏️' },
+    { name: 'セミダブルベッド',     width: 120, icon: '🛏️' },
+    { name: 'ダブルベッド',         width: 140, icon: '🛏️' },
+    { name: 'クイーンベッド',       width: 160, icon: '🛏️' },
+    { name: '2人掛けソファ',        width: 150, icon: '🛋️' },
+    { name: '3人掛けソファ',        width: 210, icon: '🛋️' },
+    { name: '洗濯機（標準）',       width: 60,  icon: '🫧' },
+    { name: '大型冷蔵庫',           width: 70,  icon: '🧊' },
+    { name: 'ダイニングテーブル4人用', width: 90, icon: '🪑' },
+    { name: '本棚（大型）',         width: 90,  icon: '📚' },
+  ];
+
+  function showFurnitureResults() {
+    if (!measuredCm) return;
+
+    document.getElementById('result-cm').textContent = measuredCm.toFixed(1);
+    const list = document.getElementById('furniture-list');
+    list.innerHTML = '';
+
+    // 通れる順にソート
+    const sorted = [...furnitureData].sort((a, b) => {
+      const aMargin = measuredCm - (a.width + 5);
+      const bMargin = measuredCm - (b.width + 5);
+      return bMargin - aMargin;
+    });
+
+    sorted.forEach((f, idx) => {
+      const needed = f.width + 5;   // 家具幅 + 余裕5cm
+      const margin = measuredCm - needed;
+      const isOk   = margin >= 10;
+      const isEdge = margin >= 0 && margin < 10;
+      const isNg   = margin < 0;
+
+      const cls   = isOk ? 'ok' : isEdge ? 'edge' : 'ng';
+      const badge = isOk ? `✅ 余裕 +${margin.toFixed(0)}cm`
+                  : isEdge ? `△ ギリギリ +${margin.toFixed(0)}cm`
+                  : `❌ ${Math.abs(margin).toFixed(0)}cm 不足`;
+
+      const div = document.createElement('div');
+      div.className = `furniture-item ${cls}`;
+      div.style.animationDelay = `${idx * 0.05}s`;
+      div.innerHTML = `
+        <div>
+          <div class="f-name">${f.icon} ${f.name}</div>
+          <div class="f-size">幅 ${f.width}cm（必要幅 ${needed}cm）</div>
+        </div>
+        <div class="f-badge">${badge}</div>
+      `;
+      list.appendChild(div);
+    });
+  }
+
+  // ===========================
+  // UI ヘルパー
+  // ===========================
+  function setGuide(emoji, html) {
+    document.querySelector('#guide-msg .emoji').textContent = emoji;
+    document.getElementById('guide-text').innerHTML = html;
+  }
+
+  function showError(msg) {
+    const box = document.getElementById('error-box');
+    document.getElementById('error-text').textContent = msg;
+    box.style.display = 'block';
+  }
+
+  function hideError() {
+    document.getElementById('error-box').style.display = 'none';
+  }
+</script>
+</body>
+</html>
